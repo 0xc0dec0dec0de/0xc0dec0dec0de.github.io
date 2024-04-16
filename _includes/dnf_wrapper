@@ -1,0 +1,43 @@
+#!/bin/bash
+
+#
+# DNF wrapper
+#
+
+# Detect if we're running under `sudo`.
+# This is not entirely safe or accurate.
+if [ -n "${SUDO_USER}" ]; then
+    # Get the home directory for SUDO_USER.
+    # Fun fact: ~ expansion of home directories doesn't work with a variable,
+    # so we're introducing a layer of indirection to substitute in the value
+    # before getting the subshell to expand it.
+    USER_HOME=$(bash -c "echo ~${SUDO_USER}")
+else
+    USER_HOME=${HOME}
+fi
+
+config=$(find "${USER_HOME}/.jfrog" -name jfrog-cli.conf.v\* | sort -V | tail -n 1)
+if [ -f "${config}" ]; then
+    if [ -n "${SUDO_USER}" ]; then
+        content=$(sudo -u "${SUDO_USER}" cat "${config}")
+    else
+        content=$(cat "${config}")
+    fi
+
+    servers$(echo "${content}" | jq '.servers | length')
+    if [ "${servers}" -gt 0 ]; then
+        last_server=$((servers - 1))
+
+        for n in $(eval echo "${0..${last_server}}"); do
+            server=$(echo "${content}" | jq -r ".servers[$n] | .url")
+            var_prefix=DNF_VAR_$(echo "${server^^}" | sed 's,^HTTPS://,,' | sed 's,/.*$,,' | tr '.-' '__')
+            uservar=${var_prefix}_USER
+            passvar=${var_prefix}_PASS
+            export "${uservar}"="$(echo "${content}" | jq -r ".servers[$n] | .user")"
+            export "${passvar}"="$(echo "${content}" | jq -r ".servers[$n] | .password")"
+        done
+    fi
+fi
+
+/usr/bin/dnf "$@"
+exit $?
