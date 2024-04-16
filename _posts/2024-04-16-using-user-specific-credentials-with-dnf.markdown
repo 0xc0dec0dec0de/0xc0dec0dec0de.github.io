@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Using user-specific credentials with DNF and JFrog Artifactory"
-date:   2024-04-16 16:30:00 -0500
+date:   2024-04-16 16:30:00 -0400
 categories:
   - 
 tags:
